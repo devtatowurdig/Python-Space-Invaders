@@ -1,5 +1,6 @@
 import random
 import pygame
+import time
 
 
 TAMANHO_GRADE = 17
@@ -11,7 +12,7 @@ INIMIGO = 'I'
 TIRO_PLAYER = '.'
 COLISAO = 'X'
 VAZIO = ' '
-
+TAMANHO_TELA_CALCULADO = (TAMANHO_BOX + MARGEM) * TAMANHO_GRADE + MARGEM
 
 
 tabuleiro = []
@@ -112,15 +113,8 @@ def move_tiros(tabuleiro):
                 else:
                     tabuleiro[indice_linha][indice_coluna] = VAZIO
 
-                    
-cria_tabuleiro()
-player_x = 9
-player_y = 16
-inimigo_timer = 0
-inimigo_intervalo = 10
-
 def tela_start(screen):
-    imagem = pygame.image.load("/img/start.png")
+    imagem = pygame.image.load("start.png")
     imagem = pygame.transform.scale(imagem, (screen.get_width(), screen.get_height()))
     rect = imagem.get_rect(screen.get_width() // 2, screen.get_height() // 2)
     esperando = True
@@ -161,3 +155,201 @@ def tela_nome_jogador(screen):
                     if len(nome) < 12 and event.unicode.isprintable():
                         nome += event.unicode
     return nome
+
+
+def atualiza_ranking(jogador, pontuacao): 
+    NOME_ARQUIVO = "ranking.txt"
+    ranking = []
+    
+    try:
+        with open("ranking.txt", "r") as arquivo:
+            linhas = arquivo.readlines()
+            for linha in linhas:
+                partes = linha.strip().split(';')
+                if len(partes) == 2:
+                    ranking.append((partes[0], int(partes[1])))
+    except FileNotFoundError:
+        pass
+    
+    ranking.append((jogador, pontuacao))
+    ranking = sorted(ranking, key = lambda x: x[1], reverse = True)[:5]
+    
+    with open("ranking.txt", "w") as arquivo:
+        for nome, pontos in ranking:
+            arquivo.write(f"{nome};{pontos}\n")
+            
+    return ranking
+
+def tela_ranking(screen, ranking_lista):
+    fonte_titulo = pygame.font.SysFont("bold", 64)
+    fonte_texto = pygame.font.SysFont(None, 48)
+    
+    screen.fill((0 , 2, 0))
+    
+    titulo = fonte_titulo.render("Ranking - Top 5", True, (255, 255, 0))
+    rect_titulo = titulo.get_rect(center=(screen.get_width() // 2, 80))
+    screen.blit(titulo, rect_titulo)
+    
+    posicao_y = 160
+    for indice, (nome, pontos) in enumerate(ranking_lista):
+        texto_ranking = f"{indice + 1}. {nome} - {pontos}"
+        
+        superficie_texto = fonte_texto.render(texto_ranking, True, (255, 255, 255))
+        rect_texto = superficie_texto.get_rect(center=(screen.get_width() // 2, posicao_y))
+        screen.blit(superficie_texto, rect_texto)
+        
+        posicao_y += 60
+        
+    pygame.display.flip()
+    time.sleep(4)
+    
+def tela_gameover(screen):
+    fonte_go = pygame.font.SysFont(None, 64)
+    texto_go = fonte_go.render("Game Over!", True, (255, 0, 0))
+    rect_go = texto_go.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
+    
+    screen.fill((0 , 0, 0))
+    screen.blit(texto_go, rect_go)
+    pygame.display.flip()
+    time.sleep(3)
+                         
+def tela_continue(screen):
+    fonte = pygame.font.SysFont(None, 40)
+    esperando = True
+    
+    while esperando:
+        screen.fill((0, 0, 0))
+        
+        texto_render = fonte.render("Pressione ENTER para jogar novamente ou ESC para sair")
+        rect_texto = texto_render.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2 ))
+        screen.blit(texto_render, rect_texto)
+        
+        pygame.display.flip()
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return False
+        
+        for event in pygame.KEYDOWN:
+            if event.key == pygame.K_RETURN:
+                return True
+            if event.key == pygame.K_ESCAPE:
+                return False
+                         
+                         
+
+
+
+## Programa 
+
+pygame.init()
+screen = pygame.display.set_mode((TAMANHO_TELA_CALCULADO, TAMANHO_TELA_CALCULADO))
+pygame.display.set_caption("Python Space Invadars - Matriz")
+clock = pygame.time.Clock()
+
+tela_start(screen)
+jogador = tela_nome_jogador(screen)
+
+jogando_app = True
+
+while jogando_app:
+    
+    wave = 1
+    max_waves = 5 #TODO:Alterar pra escolher a dificuldade
+    game_over = False
+    Vitoria = False
+    font_wave = pygame.font.SysFont(None, 32)
+    pontuacao = 0
+
+
+    cria_tabuleiro()
+    player_x = 9
+    player_y = 16
+    posiciona_player(player_x, player_y)
+    posiciona_inimigos()
+    inimigo_timer = 0
+    inimigo_intervalo = 10
+    
+    
+        
+    while not game_over: 
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                game_over = True
+                jogando_app = False
+                
+        keys = pygame.key.get_pressed()
+        
+        #Teclas de movimento do player
+        if keys[pygame.K_a] and player_x > 0:
+            tabuleiro[player_y][player_x] =  VAZIO
+            player_x = player_x - 1
+            tabuleiro[player_y][player_x] = PLAYER
+        elif keys[pygame.K_d] and player_x < TAMANHO_GRADE - 1 :
+            tabuleiro[player_y][player_x] =  VAZIO
+            player_x = player_x + 1
+            tabuleiro[player_y][player_x] =  PLAYER
+            
+        #Tiro
+        if keys[pygame.K_SPACE]:
+            atirar(tabuleiro, player_x, player_y)
+        
+        inimigo_timer = inimigo_timer + 1
+        if inimigo_timer >= inimigo_intervalo:
+            if move_inimigo(tabuleiro, player_x, player_y):
+                desenha_tabuleiro(screen, tabuleiro)
+                pygame.display.flip()
+                tela_gameover(screen)
+                break
+            inimigo_timer = 0
+        move_tiros(tabuleiro)
+        
+        if conta_inimigos(tabuleiro) == 0:
+            pontuacao += 100
+            if wave < max_waves:
+                wave = wave + 1
+                
+                for indice_linha in range(TAMANHO_GRADE):
+                    for indice_coluna in range(TAMANHO_GRADE):
+                        if tabuleiro[indice_linha][indice_coluna] in [INIMIGO, TIRO_PLAYER, COLISAO]:
+                            tabuleiro[indice_linha][indice_coluna] = VAZIO
+                posiciona_inimigos()
+            else:
+                vitoria = True
+                game_over = True
+        
+        screen.fill((0, 0, 0))
+        desenha_tabuleiro(screen, tabuleiro)
+        
+        texto_wave = font_wave.render(f'Wave: {wave}', True, (255, 255, 255))
+        screen.blit(texto_wave, (10, 10))
+        texto_score = font_wave.render(f'Score: {pontuacao}', True, (255, 255, 0))
+        screen.blit(texto_score, (10, 40))
+        
+        pygame.display.flip()
+        clock.tick(15)
+        
+        
+        
+        #Reiniciar o jogo
+    
+    if jogando_app:
+        if vitoria:
+            screen.fill((0, 0, 0))
+            fonte_vitoria = pygame.font.SysFont(None, 64)
+            texto_vitoria = fonte_vitoria.render('Vitória!!', True, (0, 255, 0))
+            rect = texto_vitoria.get_rect(center = (screen.get_width() // 2, screen.get_height() // 2))
+            screen.blit(texto_vitoria, rect)
+            pygame.display.flip()
+            time.sleep(3)
+            
+        ranking_atual = atualiza_ranking(jogador, pontuacao)
+        tela_ranking(screen, ranking_atual)
+        
+        #Contiue
+        jogando_app = tela_continue(screen)
+
+pygame.quit()
+exit()
+            
+    
