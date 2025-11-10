@@ -274,7 +274,30 @@ def tela_continue(screen):
                 if event.key == pygame.K_ESCAPE:
                     return False
                          
-                         
+def tela_pause(screen):
+    fonte = pygame.font.SysFont("bold", 50)
+    fonte2 = pygame.font.SysFont("bold", 25)
+    esperando = True
+    while esperando:
+        screen.fill((0, 0, 0))
+        texto = fonte.render("Jogo Pausado", True, (255, 255, 255))            
+        rect = texto.get_rect(center=(screen.get_width() // 5, screen.get_height()  - 120))
+        screen.blit(texto, rect)
+        texto2= fonte2.render("ENTER para continuar", True, (120, 120, 120))
+        rect2 = texto.get_rect(center=(screen.get_width() // 5, screen.get_height() - 50))
+        screen.blit(texto2, rect2)
+        texto3= fonte2.render("ESC para sair", True, (120, 120, 120))
+        rect3 = texto.get_rect(center=(screen.get_width() // 5, screen.get_height() - 30))
+        screen.blit(texto3, rect3)
+        pygame.display.flip()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    return True
+                if event.key == pygame.K_ESCAPE:
+                    return False
 
 
 
@@ -291,6 +314,7 @@ jogando_app = True
 while jogando_app:
     
     tela_start(screen)
+    pygame.event.clear()
     jogador = ""
     while not jogador:
         jogador = tela_nome_jogador(screen)
@@ -321,7 +345,13 @@ while jogando_app:
             if event.type == pygame.QUIT:
                 game_over = True
                 jogando_app = False
-
+        #Pause
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                continuar = tela_pause(screen)
+                if not continuar:
+                    game_over = True
+                    jogando_app = False
+                    break
         
         keys = pygame.key.get_pressed()
         
@@ -340,6 +370,8 @@ while jogando_app:
         if keys[pygame.K_SPACE] and tempo_atual - ultimo_tiro > intervalo_tiro:
             atirar(tabuleiro, player_x, player_y)
             ultimo_tiro = tempo_atual
+        
+        
         
         inimigo_timer = inimigo_timer + 1
         inimigo_escapou_aqui = False
