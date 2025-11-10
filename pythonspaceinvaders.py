@@ -1,11 +1,12 @@
 import random
 import pygame
 import time
+import math
 
 
-TAMANHO_GRADE = 17
+TAMANHO_GRADE = 21
 TAMANHO_BOX = 28
-MARGEM = 2
+MARGEM = 10
 
 PLAYER = 'P'
 INIMIGO = 'I'
@@ -14,20 +15,30 @@ COLISAO = 'X'
 VAZIO = ' '
 TAMANHO_TELA_CALCULADO = (TAMANHO_BOX + MARGEM) * TAMANHO_GRADE + MARGEM
 
+sprite_player = pygame.transform.scale(pygame.image.load("naves/player.png"), (TAMANHO_BOX, TAMANHO_BOX))
+sprite_inimigo = pygame.transform.scale(pygame.image.load("naves/inimigo.png"), (TAMANHO_BOX, TAMANHO_BOX))
+sprite_tiro = pygame.transform.scale(pygame.image.load("naves/tiro.png"), (TAMANHO_BOX, TAMANHO_BOX))
+sprite_colisao = pygame.transform.scale(pygame.image.load("naves/colisao.gif"), (TAMANHO_BOX, TAMANHO_BOX))
 
 tabuleiro = []
 
 def cria_tabuleiro():
-    for i in range(17):
+    tabuleiro.clear()
+    for i in range(TAMANHO_GRADE):
         tabuleiro.append([]) #adiciona um array dentro do array
-        for _ in range(17):
+        for _ in range(TAMANHO_GRADE):
             tabuleiro[i].append(' ')
             
 def posiciona_player(player_x, player_y):
+    for linha in tabuleiro:
+        for i in range(len(linha)):
+            if linha[i] == PLAYER:
+                linha[i] = VAZIO
+                
     tabuleiro[player_y][player_x] = PLAYER
 
-def posiciona_inimigos():
-    colunas_inimigos = random.sample(range(17), 2) #sorteia 2 números do range para posicionar os inimigos
+def posiciona_inimigos(qtd_inimigos):
+    colunas_inimigos = random.sample(range(TAMANHO_GRADE), qtd_inimigos) #sorteia 2 números do range para posicionar os inimigos
     for c in colunas_inimigos:
         tabuleiro[0][c] = INIMIGO
         
@@ -47,50 +58,62 @@ def desenha_tabuleiro(screen, tabuleiro):
             pos_y = indice_linha * (TAMANHO_BOX + MARGEM) + MARGEM
             cor = (40, 40, 40) 
             if tabuleiro[indice_linha][indice_coluna] == PLAYER:
-                cor = (0, 255, 0)
+                screen.blit(sprite_player, (pos_x, pos_y))
             elif tabuleiro[indice_linha][indice_coluna] == INIMIGO:
-                cor = (255, 0, 0)
+                screen.blit(sprite_inimigo, (pos_x, pos_y))
             elif tabuleiro[indice_linha][indice_coluna] == TIRO_PLAYER:
-                cor = (255, 255, 0)
+                screen.blit(sprite_tiro, (pos_x, pos_y))
             elif tabuleiro[indice_linha][indice_coluna] == COLISAO:
-                cor = (255, 0, 255)
-            pygame.draw.rect(screen, cor, (pos_x, pos_y, TAMANHO_BOX, TAMANHO_BOX)) # Onde desenhar, a cor, posicoes, largura, altura.
+                screen.blit(sprite_colisao, (pos_x, pos_y))
+            # pygame.draw.rect(screen, cor, (pos_x, pos_y, TAMANHO_BOX, TAMANHO_BOX)) # Onde desenhar, a cor, posicoes, largura, altura.
 
-def move_inimigo(tabuleiro, player_x, player_y):
+def move_inimigo(tabuleiro, player_x, player_y, pontuacao):
+    escapou = False
+    
     for indice_linha in range(len(tabuleiro)-2, -1, -1):
         for indice_coluna in range(len(tabuleiro[indice_linha])):
             
             if tabuleiro[indice_linha][indice_coluna] == INIMIGO:
                 linha_abaixo = indice_linha + 1
-                
-                if linha_abaixo == player_y and indice_coluna == player_x: # Se o inimigo encostou no player
-                    tabuleiro[indice_linha][indice_coluna] = VAZIO
-                    tabuleiro[player_y][player_x] = COLISAO
-                    return True
-                
-                if tabuleiro[linha_abaixo][indice_coluna] == VAZIO: # Move para espaço vazio
+               
+                if linha_abaixo == player_y and indice_coluna == player_x:
+                    tabuleiro[indice_linha][indice_coluna] = VAZIO #inimigo some
+                    pontuacao = max(0, pontuacao - 5) #perde 5 pontos
+
+                    if pontuacao <= 0:
+                        tabuleiro[player_y][player_x] = COLISAO
+                        return pontuacao, True, escapou
+                    
+                elif tabuleiro[linha_abaixo][indice_coluna] == VAZIO:
                     tabuleiro[linha_abaixo][indice_coluna] = INIMIGO
                     tabuleiro[indice_linha][indice_coluna] = VAZIO
-    
-    ultima_linha= len(tabuleiro) -1
+                    
+    ultima_linha = len(tabuleiro) - 1
     for indice_coluna in range(len(tabuleiro[ultima_linha])): # Tira do tabuleiro inimigos que chegam no final
         if tabuleiro[ultima_linha][indice_coluna] == INIMIGO:
             tabuleiro[ultima_linha][indice_coluna] = VAZIO
-    
-    return False
+            pontuacao = max(0, pontuacao - 5)
+            escapou = True
+            
+            if pontuacao <= 0:
+                tabuleiro[player_y][player_x] = COLISAO
+                return pontuacao, True, escapou
+     
+    return pontuacao, False, escapou
 
 def conta_tiros(tabuleiro):
     contador_total = 0
     for linha in tabuleiro:
         tiros_ingame = linha.count(TIRO_PLAYER)
         contador_total = contador_total + tiros_ingame
+    return contador_total
         
 def atirar(tabuleiro, player_x, player_y):
-    if conta_tiros(tabuleiro) == 0:
-        if player_y > 0 and tabuleiro[player_y - 1][player_x] == VAZIO:
-            tabuleiro[player_y - 1][player_x] = TIRO_PLAYER
+    if player_y > 0 and tabuleiro[player_y - 1][player_x] == VAZIO:
+        tabuleiro[player_y - 1][player_x] = TIRO_PLAYER
             
 def move_tiros(tabuleiro):
+    inimigos_abatidos = 0
     linha_topo = 0
     for indice_coluna in range(TAMANHO_GRADE): 
         if tabuleiro[linha_topo][indice_coluna] == TIRO_PLAYER:
@@ -105,18 +128,18 @@ def move_tiros(tabuleiro):
                 if tabuleiro[linha_acima][indice_coluna] == INIMIGO:
                    tabuleiro[linha_acima][indice_coluna] = VAZIO #remove inimigo
                    tabuleiro[indice_linha][indice_coluna] = VAZIO #remove tiro
-                   
+                   inimigos_abatidos += 1
                 elif tabuleiro[linha_acima][indice_coluna] == VAZIO:
                     tabuleiro[linha_acima][indice_coluna] = TIRO_PLAYER
                     tabuleiro[indice_linha][indice_coluna] = VAZIO
                 
                 else:
                     tabuleiro[indice_linha][indice_coluna] = VAZIO
-
+    return inimigos_abatidos
 def tela_start(screen):
     imagem = pygame.image.load("start.png")
     imagem = pygame.transform.scale(imagem, (screen.get_width(), screen.get_height()))
-    rect = imagem.get_rect(screen.get_width() // 2, screen.get_height() // 2)
+    rect = imagem.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
     esperando = True
     while esperando:
         screen.fill((0, 0, 0))
@@ -162,7 +185,7 @@ def atualiza_ranking(jogador, pontuacao):
     ranking = []
     
     try:
-        with open("ranking.txt", "r") as arquivo:
+        with open(NOME_ARQUIVO, "r") as arquivo:
             linhas = arquivo.readlines()
             for linha in linhas:
                 partes = linha.strip().split(';')
@@ -174,9 +197,10 @@ def atualiza_ranking(jogador, pontuacao):
     ranking.append((jogador, pontuacao))
     ranking = sorted(ranking, key = lambda x: x[1], reverse = True)[:5]
     
-    with open("ranking.txt", "w") as arquivo:
+    with open(NOME_ARQUIVO, "w") as arquivo:
         for nome, pontos in ranking:
-            arquivo.write(f"{nome};{pontos}\n")
+            if pontos > 0:
+                arquivo.write(f"{nome};{pontos}\n")
             
     return ranking
 
@@ -184,7 +208,7 @@ def tela_ranking(screen, ranking_lista):
     fonte_titulo = pygame.font.SysFont("bold", 64)
     fonte_texto = pygame.font.SysFont(None, 48)
     
-    screen.fill((0 , 2, 0))
+    screen.fill((5 , 5, 5))
     
     titulo = fonte_titulo.render("Ranking - Top 5", True, (255, 255, 0))
     rect_titulo = titulo.get_rect(center=(screen.get_width() // 2, 80))
@@ -192,36 +216,37 @@ def tela_ranking(screen, ranking_lista):
     
     posicao_y = 160
     for indice, (nome, pontos) in enumerate(ranking_lista):
-        texto_ranking = f"{indice + 1}. {nome} - {pontos}"
-        
-        superficie_texto = fonte_texto.render(texto_ranking, True, (255, 255, 255))
-        rect_texto = superficie_texto.get_rect(center=(screen.get_width() // 2, posicao_y))
-        screen.blit(superficie_texto, rect_texto)
-        
-        posicao_y += 60
+        if pontos > 0:
+            texto_ranking = f"{indice + 1}. {nome} - {pontos}"
+            
+            superficie_texto = fonte_texto.render(texto_ranking, True, (255, 255, 255))
+            rect_texto = superficie_texto.get_rect(topleft=(40, posicao_y))
+            screen.blit(superficie_texto, rect_texto)
+            
+            posicao_y += 60
         
     pygame.display.flip()
     time.sleep(4)
     
 def tela_gameover(screen):
-    fonte_go = pygame.font.SysFont(None, 64)
-    texto_go = fonte_go.render("Game Over!", True, (255, 0, 0))
-    rect_go = texto_go.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
+    imagem = pygame.image.load("gameover.png")
+    imagem = pygame.transform.scale(imagem, (screen.get_width(), screen.get_height()))
+    rect = imagem.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
     
     screen.fill((0 , 0, 0))
-    screen.blit(texto_go, rect_go)
+    screen.blit(imagem, rect)
     pygame.display.flip()
     time.sleep(3)
                          
 def tela_continue(screen):
-    fonte = pygame.font.SysFont(None, 40)
+    fonte = pygame.font.SysFont(None, 25)
     esperando = True
     
     while esperando:
         screen.fill((0, 0, 0))
         
-        texto_render = fonte.render("Pressione ENTER para jogar novamente ou ESC para sair")
-        rect_texto = texto_render.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2 ))
+        texto_render = fonte.render("Pressione ENTER para jogar novamente ou ESC para sair", True, (255, 255, 255))
+        rect_texto = texto_render.get_rect(center=(screen.get_width() // 2, screen.get_height() - 20 ))
         screen.blit(texto_render, rect_texto)
         
         pygame.display.flip()
@@ -230,11 +255,11 @@ def tela_continue(screen):
             if event.type == pygame.QUIT:
                 return False
         
-        for event in pygame.KEYDOWN:
-            if event.key == pygame.K_RETURN:
-                return True
-            if event.key == pygame.K_ESCAPE:
-                return False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    return True
+                if event.key == pygame.K_ESCAPE:
+                    return False
                          
                          
 
@@ -244,31 +269,37 @@ def tela_continue(screen):
 
 pygame.init()
 screen = pygame.display.set_mode((TAMANHO_TELA_CALCULADO, TAMANHO_TELA_CALCULADO))
-pygame.display.set_caption("Python Space Invadars - Matriz")
+pygame.display.set_caption("Python Space Invaders - Matriz")
 clock = pygame.time.Clock()
-
-tela_start(screen)
-jogador = tela_nome_jogador(screen)
 
 jogando_app = True
 
+
 while jogando_app:
+    
+    tela_start(screen)
+    jogador = ""
+    while not jogador:
+        jogador = tela_nome_jogador(screen)
+
     
     wave = 1
     max_waves = 5 #TODO:Alterar pra escolher a dificuldade
     game_over = False
-    Vitoria = False
+    vitoria = False
     font_wave = pygame.font.SysFont(None, 32)
     pontuacao = 0
 
 
     cria_tabuleiro()
-    player_x = 9
-    player_y = 16
+    player_x = math.ceil(TAMANHO_GRADE / 2)
+    player_y = TAMANHO_GRADE - 1
     posiciona_player(player_x, player_y)
-    posiciona_inimigos()
+    posiciona_inimigos(2)
     inimigo_timer = 0
     inimigo_intervalo = 10
+    ultimo_tiro = 0
+    intervalo_tiro = 200
     
     
         
@@ -277,7 +308,8 @@ while jogando_app:
             if event.type == pygame.QUIT:
                 game_over = True
                 jogando_app = False
-                
+
+        
         keys = pygame.key.get_pressed()
         
         #Teclas de movimento do player
@@ -291,40 +323,61 @@ while jogando_app:
             tabuleiro[player_y][player_x] =  PLAYER
             
         #Tiro
-        if keys[pygame.K_SPACE]:
+        tempo_atual = pygame.time.get_ticks()
+        if keys[pygame.K_SPACE] and tempo_atual - ultimo_tiro > intervalo_tiro:
             atirar(tabuleiro, player_x, player_y)
+            ultimo_tiro = tempo_atual
         
         inimigo_timer = inimigo_timer + 1
+        inimigo_escapou_aqui = False
         if inimigo_timer >= inimigo_intervalo:
-            if move_inimigo(tabuleiro, player_x, player_y):
+            
+            pontuacao, perdeu, escapou = move_inimigo(tabuleiro, player_x, player_y, pontuacao)
+            
+            if(perdeu):
                 desenha_tabuleiro(screen, tabuleiro)
                 pygame.display.flip()
+                time.sleep(2)
                 tela_gameover(screen)
                 break
+            
+            if(escapou):
+                inimigo_escapou_aqui = True
+                
             inimigo_timer = 0
-        move_tiros(tabuleiro)
+        pontuacao += move_tiros(tabuleiro) * (5 * wave)
+               
         
-        if conta_inimigos(tabuleiro) == 0:
-            pontuacao += 100
+        if conta_inimigos(tabuleiro) == 0 and not inimigo_escapou_aqui:
             if wave < max_waves:
                 wave = wave + 1
+                inimigo_intervalo = inimigo_intervalo - 1
                 
                 for indice_linha in range(TAMANHO_GRADE):
                     for indice_coluna in range(TAMANHO_GRADE):
                         if tabuleiro[indice_linha][indice_coluna] in [INIMIGO, TIRO_PLAYER, COLISAO]:
                             tabuleiro[indice_linha][indice_coluna] = VAZIO
-                posiciona_inimigos()
+                            
+                qtd_inimigos = min(2 + wave - 1, TAMANHO_GRADE)
+                posiciona_inimigos(qtd_inimigos)
             else:
                 vitoria = True
                 game_over = True
+            
         
         screen.fill((0, 0, 0))
         desenha_tabuleiro(screen, tabuleiro)
         
         texto_wave = font_wave.render(f'Wave: {wave}', True, (255, 255, 255))
-        screen.blit(texto_wave, (10, 10))
+        rect_wave = texto_wave.get_rect(right = screen.get_width() - 45, top = 10)
+        screen.blit(texto_wave, rect_wave)
+        
         texto_score = font_wave.render(f'Score: {pontuacao}', True, (255, 255, 0))
-        screen.blit(texto_score, (10, 40))
+        rect_score = texto_wave.get_rect(right = screen.get_width() - 45, top = 40)
+        screen.blit(texto_score, rect_score)
+        
+        text_player = font_wave.render(f"Player: {jogador}", True, (0, 255, 125))
+        screen.blit(text_player, (10, 10))
         
         pygame.display.flip()
         clock.tick(15)
@@ -336,16 +389,17 @@ while jogando_app:
     if jogando_app:
         if vitoria:
             screen.fill((0, 0, 0))
-            fonte_vitoria = pygame.font.SysFont(None, 64)
-            texto_vitoria = fonte_vitoria.render('Vitória!!', True, (0, 255, 0))
-            rect = texto_vitoria.get_rect(center = (screen.get_width() // 2, screen.get_height() // 2))
-            screen.blit(texto_vitoria, rect)
+            imagem = pygame.image.load("vitoria.png")
+            imagem = pygame.transform.scale(imagem, (screen.get_width(), screen.get_height()))
+            rect = imagem.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
+    
+            screen.blit(imagem, rect)
             pygame.display.flip()
             time.sleep(3)
-            
+
         ranking_atual = atualiza_ranking(jogador, pontuacao)
         tela_ranking(screen, ranking_atual)
-        
+    
         #Contiue
         jogando_app = tela_continue(screen)
 
