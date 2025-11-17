@@ -3,10 +3,13 @@ import pygame
 import time
 import math
 
+pygame.mixer.init()
+
+
 explosoes = []
 TEMPO_EXPLOSAO = 300
 TAMANHO_GRADE = 21
-TAMANHO_BOX = 28
+TAMANHO_BOX = 22
 MARGEM = 10
 
 PLAYER = 'P'
@@ -17,10 +20,32 @@ VAZIO = ' '
 TAMANHO_TELA_CALCULADO = (TAMANHO_BOX + MARGEM) * TAMANHO_GRADE + MARGEM
 
 sprite_player = pygame.transform.scale(pygame.image.load("naves/player.png"), (TAMANHO_BOX, TAMANHO_BOX))
-sprite_inimigo = pygame.transform.scale(pygame.image.load("naves/inimigo.png"), (TAMANHO_BOX, TAMANHO_BOX))
+sprite_inimigo_facil = pygame.transform.scale(pygame.image.load("naves/inimigo.png"), (TAMANHO_BOX, TAMANHO_BOX))
+sprite_inimigo_medio = pygame.transform.scale(pygame.image.load("naves/inimigo2.png"), (TAMANHO_BOX, TAMANHO_BOX))
+sprite_inimigo_dificil = pygame.transform.scale(pygame.image.load("naves/inimigo3.png"), (TAMANHO_BOX, TAMANHO_BOX))
 sprite_tiro = pygame.transform.scale(pygame.image.load("naves/tiro.png"), (TAMANHO_BOX, TAMANHO_BOX))
 sprite_colisao = pygame.transform.scale(pygame.image.load("naves/colisao.png"), (TAMANHO_BOX, TAMANHO_BOX))
+    
+#Sons do jogo
 
+som_tiro = pygame.mixer.Sound("sound/tiro2.mp3")   
+som_tiro.set_volume(0.1)
+
+som_colisao = pygame.mixer.Sound("sound/explode.mp3")
+som_colisao.set_volume(0.05)
+
+som_inicio = pygame.mixer.Sound("sound/starttheme.mp3")
+som_inicio.set_volume(0.3)
+
+som_go = pygame.mixer.Sound("sound/gameover.mp3")
+som_go.set_volume(0.3)
+
+som_jogo = pygame.mixer.Sound("sound/theme.mp3")
+som_jogo.set_volume(0.3)
+        
+
+
+    
 tabuleiro = []
 
 def cria_tabuleiro():
@@ -39,13 +64,20 @@ def posiciona_player(player_x, player_y):
     tabuleiro[player_y][player_x] = PLAYER
 
 def posiciona_inimigos(qtd_inimigos):
-    colunas_inimigos = random.sample(range(TAMANHO_GRADE), qtd_inimigos) 
-    colunas_inimigos_hard = random.sample(range(TAMANHO_GRADE), qtd_inimigos) 
-    for indice_coluna in colunas_inimigos:
-        tabuleiro[0][indice_coluna] = INIMIGO
-        if wave >= 3:
-            for indice_coluna in colunas_inimigos_hard:
-                tabuleiro[2][indice_coluna] = INIMIGO
+    padroes = {
+        1: [[1,5,10,15,19]],
+        2: [[1,5,9,11,15,19], [3, 17]],
+        3: [[1,5,9,11,15,19],[2,4,10,16,18], [3,17]],
+        4: [[1,3,5,8,9,11,12,15,17,19],[2,4,10,16,18], [3,10,17]],
+        # 5: [[1,2,3,4,5,7,8,9,10,11,12,13,15,16,17,18,19], [2,3,4,8,9,10,11,12,16,17,18], [3,9,10,11,17], [10]]
+        5: [[1,3,5,8,9,11,12,15,17,19], [2,4,10,16,18,17], [3,17], [2,4,10,16,18], [3,10,17]]
+    }   
+    
+    padrao = padroes.get(wave, [[i for i in range(qtd_inimigos)]])
+    
+    for linha, colunas in enumerate(padrao):
+        for indice_coluna in colunas:
+            tabuleiro[linha][indice_coluna] = INIMIGO
         
         
 def conta_inimigos(tabuleiro):
@@ -64,11 +96,18 @@ def desenha_tabuleiro(screen, tabuleiro):
             if tabuleiro[indice_linha][indice_coluna] == PLAYER:
                 screen.blit(sprite_player, (pos_x, pos_y))
             elif tabuleiro[indice_linha][indice_coluna] == INIMIGO:
-                screen.blit(sprite_inimigo, (pos_x, pos_y))
+                if wave == 1:
+                    screen.blit(sprite_inimigo_facil, (pos_x, pos_y))
+                elif wave > 1 and wave <=3:
+                    screen.blit(sprite_inimigo_medio, (pos_x, pos_y))
+                else:
+                    screen.blit(sprite_inimigo_dificil, (pos_x, pos_y))
+                    
             elif tabuleiro[indice_linha][indice_coluna] == TIRO_PLAYER:
                 screen.blit(sprite_tiro, (pos_x, pos_y))
             elif tabuleiro[indice_linha][indice_coluna] == COLISAO:
                 screen.blit(sprite_colisao, (pos_x, pos_y))
+                som_colisao.play()
             # pygame.draw.rect(screen, cor, (pos_x, pos_y, TAMANHO_BOX, TAMANHO_BOX)) # Onde desenhar, a cor, posicoes, largura, altura.
 
 def move_inimigo(tabuleiro, player_x, player_y, pontuacao):
@@ -98,6 +137,9 @@ def move_inimigo(tabuleiro, player_x, player_y, pontuacao):
                 elif tabuleiro[linha_abaixo][indice_coluna] == VAZIO:
                     tabuleiro[linha_abaixo][indice_coluna] = INIMIGO
                     tabuleiro[indice_linha][indice_coluna] = VAZIO
+                
+                elif tabuleiro[linha_abaixo][indice_coluna] != VAZIO:
+                    continue
                     
     ultima_linha = len(tabuleiro) - 1
     for indice_coluna in range(len(tabuleiro[ultima_linha])): # Tira do tabuleiro inimigos que chegam no final
@@ -120,8 +162,10 @@ def conta_tiros(tabuleiro):
     return contador_total
         
 def atirar(tabuleiro, player_x, player_y):
+    som_tiro.stop()
     if player_y > 0 and tabuleiro[player_y - 1][player_x] == VAZIO:
         tabuleiro[player_y - 1][player_x] = TIRO_PLAYER
+        som_tiro.play()
             
 def move_tiros(tabuleiro):
     global explosoes
@@ -150,6 +194,8 @@ def move_tiros(tabuleiro):
                     tabuleiro[indice_linha][indice_coluna] = VAZIO
     return inimigos_abatidos
 def tela_start(screen):
+    som_inicio.play()
+    
     imagem = pygame.image.load("img/start.png")
     imagem = pygame.transform.scale(imagem, (screen.get_width(), screen.get_height()))
     rect = imagem.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
@@ -190,6 +236,7 @@ def tela_nome_jogador(screen):
                 else:
                     if len(nome) < 12 and event.unicode.isprintable():
                         nome += event.unicode
+    som_inicio.stop()
     return nome
 
 
@@ -242,6 +289,8 @@ def tela_ranking(screen, ranking_lista):
     time.sleep(4)
     
 def tela_gameover(screen):
+    som_go.play()
+    
     imagem = pygame.image.load("img/gameover.png")
     imagem = pygame.transform.scale(imagem, (screen.get_width(), screen.get_height()))
     rect = imagem.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
@@ -250,7 +299,8 @@ def tela_gameover(screen):
     screen.blit(imagem, rect)
     pygame.display.flip()
     time.sleep(3)
-                         
+
+    som_go.stop()
 def tela_continue(screen):
     fonte = pygame.font.SysFont(None, 25)
     esperando = True
@@ -274,7 +324,7 @@ def tela_continue(screen):
                 if event.key == pygame.K_ESCAPE:
                     return False
                          
-def tela_pause(screen):
+def tela_pause(screen):   
     fonte = pygame.font.SysFont("bold", 50)
     fonte2 = pygame.font.SysFont("bold", 25)
     esperando = True
@@ -298,21 +348,25 @@ def tela_pause(screen):
                     return True
                 if event.key == pygame.K_ESCAPE:
                     return False
-
+        
 
 
 ## Programa 
 
 pygame.init()
+pygame.mixer.init()
 screen = pygame.display.set_mode((TAMANHO_TELA_CALCULADO, TAMANHO_TELA_CALCULADO))
 pygame.display.set_caption("Python Space Invaders - Matriz")
 clock = pygame.time.Clock()
+
+
 
 jogando_app = True
 
 
 while jogando_app:
     
+    som_jogo.play()
     tela_start(screen)
     pygame.event.clear()
     jogador = ""
@@ -321,7 +375,7 @@ while jogando_app:
 
     
     wave = 1
-    max_waves = 5 #TODO:Alterar pra escolher a dificuldade
+    max_waves = 5
     game_over = False
     vitoria = False
     font_wave = pygame.font.SysFont(None, 32)
@@ -329,18 +383,21 @@ while jogando_app:
 
 
     cria_tabuleiro()
+    
+    
     player_x = math.ceil(TAMANHO_GRADE / 2)
     player_y = TAMANHO_GRADE - 1
     posiciona_player(player_x, player_y)
     posiciona_inimigos(2)
     inimigo_timer = 0
-    inimigo_intervalo = 10
+    inimigo_intervalo = 12
     ultimo_tiro = 0
     intervalo_tiro = 200
     
     
         
     while not game_over: 
+               
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 game_over = True
@@ -366,7 +423,6 @@ while jogando_app:
             tabuleiro[player_y][player_x] =  PLAYER
             
         #Tiro
-        tempo_atual = pygame.time.get_ticks()
         if keys[pygame.K_SPACE] and tempo_atual - ultimo_tiro > intervalo_tiro:
             atirar(tabuleiro, player_x, player_y)
             ultimo_tiro = tempo_atual
@@ -450,12 +506,15 @@ while jogando_app:
             screen.blit(imagem, rect)
             pygame.display.flip()
             time.sleep(3)
+            
 
+        som_jogo.stop()
         ranking_atual = atualiza_ranking(jogador, pontuacao)
         tela_ranking(screen, ranking_atual)
-    
+
         #Contiue
         jogando_app = tela_continue(screen)
+        
 
 pygame.quit()
 exit()

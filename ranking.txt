@@ -1,5 +1,2 @@
-dsa;540
-asd];465
-Tacio;350
-Teste;350
-Tato;320
+Tacio;1060
+Tácio;635
